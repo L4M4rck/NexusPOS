@@ -1,4 +1,4 @@
-import { Boxes, ChartNoAxesCombined, FileText, LogOut, Package, ReceiptText, Tags, UsersRound } from 'lucide-react'
+import { Boxes, ChartNoAxesCombined, LogOut, Package, ReceiptText, Tags, UsersRound } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
 
@@ -8,8 +8,7 @@ const links = [
   { to: '/admin/categorias', label: 'Categorías', icon: Tags },
   { to: '/admin/inventario', label: 'Inventario', icon: Boxes },
   { to: '/admin/clientes', label: 'Clientes', icon: UsersRound },
-  { to: '/admin/ventas', label: 'Ventas', icon: ReceiptText },
-  { to: '/admin/facturas', label: 'Facturas', icon: FileText },
+  { to: '/admin/movimientos', label: 'Movimientos', icon: ReceiptText },
 ]
 
 export function AdminLayout() {

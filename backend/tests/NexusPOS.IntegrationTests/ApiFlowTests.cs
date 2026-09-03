@@ -7,6 +7,7 @@ using NexusPOS.Application.Auth;
 using NexusPOS.Application.Checkout;
 using NexusPOS.Application.Common;
 using NexusPOS.Application.Catalog;
+using NexusPOS.Application.Invoices;
 using NexusPOS.Infrastructure.Persistence;
 using Xunit;
 
@@ -73,6 +74,44 @@ public sealed class ApiFlowTests
         var response = await client.GetAsync("/api/admin/dashboard?period=monthly", cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Admin_CanPaginateSearchAndSortMovements()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = new NexusPosWebApplicationFactory();
+        using var client = factory.CreateSeededClient();
+        await AuthenticateAsync(client, "customer@test.local", "Customer123!");
+        var products = await client.GetFromJsonAsync<PagedResponse<ProductResponse>>("/api/products", cancellationToken);
+        var productId = products!.Items.Single().Id;
+        var quantities = new[] { 1, 2, 1 };
+        var sales = new List<SaleResponse>();
+        for (var index = 0; index < quantities.Length; index++)
+        {
+            sales.Add(await PostAndReadAsync<SaleResponse>(client, "/api/checkout", new CheckoutRequest(
+                $"paged-movement-{index}", [new CheckoutItemRequest(productId, quantities[index])] )));
+        }
+
+        await AuthenticateAsync(client, "admin@test.local", "Admin123!");
+        var firstPage = await client.GetFromJsonAsync<PagedResponse<InvoiceResponse>>(
+            "/api/invoices/movements?page=1&pageSize=2&sort=total_desc", cancellationToken);
+        var secondPage = await client.GetFromJsonAsync<PagedResponse<InvoiceResponse>>(
+            "/api/invoices/movements?page=2&pageSize=2&sort=total_desc", cancellationToken);
+        var byNumber = await client.GetFromJsonAsync<PagedResponse<InvoiceResponse>>(
+            $"/api/invoices/movements?search={sales[0].InvoiceNumber}", cancellationToken);
+        var byCustomer = await client.GetFromJsonAsync<PagedResponse<InvoiceResponse>>(
+            "/api/invoices/movements?search=cliente%20uno", cancellationToken);
+
+        firstPage!.TotalItems.Should().Be(3);
+        firstPage.TotalPages.Should().Be(2);
+        firstPage.Items.Should().HaveCount(2);
+        firstPage.Items[0].Total.Should().Be(238_000m);
+        firstPage.HasNextPage.Should().BeTrue();
+        secondPage!.Items.Should().ContainSingle();
+        secondPage.HasPreviousPage.Should().BeTrue();
+        byNumber!.Items.Should().ContainSingle().Which.Number.Should().Be(sales[0].InvoiceNumber);
+        byCustomer!.TotalItems.Should().Be(3);
     }
 
     [Fact]

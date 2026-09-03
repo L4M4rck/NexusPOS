@@ -29,6 +29,8 @@ export const salesApi = {
     (await apiClient.post<Sale>('/checkout', { items, idempotencyKey, paymentMethod })).data,
   sales: async () => (await apiClient.get<Sale[]>('/sales')).data,
   invoices: async () => (await apiClient.get<Invoice[]>('/invoices')).data,
+  movements: async (params: Record<string, string | number | undefined>) =>
+    (await apiClient.get<PagedResponse<Invoice>>('/invoices/movements', { params })).data,
   invoice: async (id: number) => (await apiClient.get<Invoice>(`/invoices/${id}`)).data,
 }
 

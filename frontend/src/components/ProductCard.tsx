@@ -6,13 +6,15 @@ import { formatCop } from '../utils/format'
 export function ProductCard({ product, onAdd }: { product: Product; onAdd: (product: Product) => void }) {
   return (
     <article className="product-card">
-      <Link to={`/catalogo/${product.id}`} className="product-image-wrap" aria-label={`Ver ${product.name}`}>
-        <img src={product.imageUrl ?? '/placeholder-product.svg'} alt={product.name} className="product-image" />
-        <span className="product-category">{product.categoryName}</span>
+      <Link to={`/catalogo/${product.id}`} className="product-preview-link" aria-label={`Ver ${product.name}`}>
+        <div className="product-image-wrap">
+          <img src={product.imageUrl ?? '/placeholder-product.svg'} alt={product.name} className="product-image" loading="lazy" />
+          <span className="product-category">{product.categoryName}</span>
+        </div>
+        <h2 className="product-preview-name">{product.name}</h2>
       </Link>
       <div className="product-body">
         <span className="product-sku">{product.sku}</span>
-        <Link to={`/catalogo/${product.id}`}><h2>{product.name}</h2></Link>
         <p className="product-description">{product.description}</p>
         <div className="product-meta">
           <strong>{formatCop(product.price)}</strong>

@@ -18,8 +18,7 @@ const AdminProductsPage = lazy(() => import('./pages/admin/AdminProductsPage').t
 const AdminCategoriesPage = lazy(() => import('./pages/admin/AdminCategoriesPage').then((module) => ({ default: module.AdminCategoriesPage })))
 const AdminInventoryPage = lazy(() => import('./pages/admin/AdminDataPages').then((module) => ({ default: module.AdminInventoryPage })))
 const AdminCustomersPage = lazy(() => import('./pages/admin/AdminDataPages').then((module) => ({ default: module.AdminCustomersPage })))
-const AdminSalesPage = lazy(() => import('./pages/admin/AdminDataPages').then((module) => ({ default: module.AdminSalesPage })))
-const AdminInvoicesPage = lazy(() => import('./pages/admin/AdminDataPages').then((module) => ({ default: module.AdminInvoicesPage })))
+const AdminMovementsPage = lazy(() => import('./pages/admin/AdminDataPages').then((module) => ({ default: module.AdminMovementsPage })))
 
 export default function App() {
   return <Suspense fallback={<LoadingState label="Cargando NexusPOS..." />}><Routes>
@@ -44,8 +43,10 @@ export default function App() {
         <Route path="categorias" element={<AdminCategoriesPage />} />
         <Route path="inventario" element={<AdminInventoryPage />} />
         <Route path="clientes" element={<AdminCustomersPage />} />
-        <Route path="ventas" element={<AdminSalesPage />} />
-        <Route path="facturas" element={<AdminInvoicesPage />} />
+        <Route path="movimientos" element={<AdminMovementsPage />} />
+        <Route path="movimientos/:id" element={<InvoicePage />} />
+        <Route path="ventas" element={<Navigate to="/admin/movimientos" replace />} />
+        <Route path="facturas" element={<Navigate to="/admin/movimientos" replace />} />
         <Route path="facturas/:id" element={<InvoicePage />} />
       </Route>
     </Route>
