@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/backend/src/">
+    <Project Path="backend/src/NexusPOS.Domain/NexusPOS.Domain.csproj" />
+    <Project Path="backend/src/NexusPOS.Application/NexusPOS.Application.csproj" />
+    <Project Path="backend/src/NexusPOS.Infrastructure/NexusPOS.Infrastructure.csproj" />
+    <Project Path="backend/src/NexusPOS.Api/NexusPOS.Api.csproj" />
+  </Folder>
+  <Folder Name="/backend/tests/">
+    <Project Path="backend/tests/NexusPOS.UnitTests/NexusPOS.UnitTests.csproj" />
+    <Project Path="backend/tests/NexusPOS.IntegrationTests/NexusPOS.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

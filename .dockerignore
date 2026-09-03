@@ -1,0 +1,12 @@
+.git
+.github
+.dotnet-cli
+.packages
+.npm-cache
+**/bin
+**/obj
+**/node_modules
+frontend/dist
+.env
+TestResults
+coverage

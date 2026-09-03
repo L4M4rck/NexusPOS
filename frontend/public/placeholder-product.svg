@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#f3f4f6"/>
+  <path d="M310 230h180a30 30 0 0 1 30 30v80a30 30 0 0 1-30 30H310a30 30 0 0 1-30-30v-80a30 30 0 0 1 30-30Z" fill="none" stroke="#d71920" stroke-width="14"/>
+  <circle cx="350" cy="300" r="18" fill="#d71920"/><path d="M430 285h50m-25-25v50" stroke="#171717" stroke-width="12" stroke-linecap="round"/>
+  <text x="400" y="440" text-anchor="middle" font-family="Arial" font-size="32" font-weight="700" fill="#171717">NEXUSPOS</text>
+</svg>

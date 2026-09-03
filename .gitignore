@@ -1,0 +1,32 @@
+# .NET
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
+TestResults/
+coverage/
+.dotnet-cli/
+.packages/
+.npm-cache/
+
+# Node
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Secrets and local state
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+*.pfx
+*.key
+mysql-data/
