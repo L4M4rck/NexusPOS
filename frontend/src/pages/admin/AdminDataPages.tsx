@@ -9,15 +9,55 @@ import { downloadInvoicePdf } from '../../utils/invoicePdf'
 import type { MovementSort } from '../../utils/movements'
 
 const movementsPageSize = 5
+const adminTablePageSize = 5
 
 export function AdminInventoryPage() {
-  const query = useQuery({ queryKey: ['inventory'], queryFn: () => catalogApi.products({ page: 1, pageSize: 50, includeInactive: 'true', sort: 'name_asc' }) })
-  return <AdminTablePage title="Inventario" eyebrow="Existencias" description="Disponibilidad actual validada por el servidor." loading={query.isLoading} error={query.isError}><table className="data-table"><thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th>Stock</th><th>Estado</th></tr></thead><tbody>{query.data?.items.map((item) => <tr key={item.id}><td>{item.sku}</td><td><strong>{item.name}</strong></td><td>{item.categoryName}</td><td><span className={item.stock <= 5 ? 'badge badge-warning' : 'badge badge-success'}>{item.stock} und.</span></td><td>{item.isActive ? 'Activo' : 'Inactivo'}</td></tr>)}</tbody></table></AdminTablePage>
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const deferredSearch = useDeferredValue(search.trim())
+  const query = useQuery({
+    queryKey: ['inventory', page, deferredSearch],
+    queryFn: () => catalogApi.products({
+      page,
+      pageSize: adminTablePageSize,
+      search: deferredSearch || undefined,
+      includeInactive: 'true',
+      sort: 'name_asc',
+    }),
+    placeholderData: (previousData) => previousData,
+  })
+  const products = query.data?.items ?? []
+  const firstResult = query.data?.totalItems ? (query.data.page - 1) * query.data.pageSize + 1 : 0
+  const lastResult = query.data?.totalItems ? firstResult + products.length - 1 : 0
+
+  return <AdminTablePage title="Inventario" eyebrow="Existencias" description="Disponibilidad actual validada por el servidor." loading={query.isLoading} error={query.isError} wrap={false}>
+    <div className="table-toolbar">
+      <label className="search-field">
+        <Search size={19} />
+        <span className="sr-only">Buscar producto por SKU</span>
+        <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Buscar por SKU..." />
+      </label>
+    </div>
+    <div className="admin-table-summary">Mostrando {firstResult}–{lastResult} de {query.data?.totalItems ?? 0} productos</div>
+    <div className="table-wrap"><table className="data-table"><thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th>Stock</th><th>Estado</th></tr></thead><tbody>{products.length > 0 ? products.map((item) => <tr key={item.id}><td>{item.sku}</td><td><strong>{item.name}</strong></td><td>{item.categoryName}</td><td><span className={item.stock <= 5 ? 'badge badge-warning' : 'badge badge-success'}>{item.stock} und.</span></td><td>{item.isActive ? 'Activo' : 'Inactivo'}</td></tr>) : <tr><td colSpan={5}><EmptyState message="No se encontraron productos con ese SKU." /></td></tr>}</tbody></table></div>
+    <TablePagination page={query.data?.page ?? page} totalPages={query.data?.totalPages ?? 0} disabled={query.isFetching} label="Paginación del inventario" onPageChange={setPage} />
+  </AdminTablePage>
 }
 
 export function AdminCustomersPage() {
+  const [page, setPage] = useState(1)
   const query = useQuery({ queryKey: ['customers'], queryFn: adminApi.customers })
-  return <AdminTablePage title="Clientes" eyebrow="Relaciones" description="Perfiles registrados en NexusPOS." loading={query.isLoading} error={query.isError}><table className="data-table"><thead><tr><th>Cliente</th><th>Documento</th><th>Contacto</th><th>Ciudad / Dirección</th><th>Registro</th></tr></thead><tbody>{query.data?.map((item) => <tr key={item.id}><td><strong>{item.firstName} {item.lastName}</strong><small>{item.email}</small></td><td>{item.documentNumber}</td><td>{item.phone ?? '—'}</td><td>{item.address ?? '—'}</td><td>{formatDate(item.createdAt)}</td></tr>)}</tbody></table></AdminTablePage>
+  const customers = query.data ?? []
+  const totalPages = Math.ceil(customers.length / adminTablePageSize)
+  const visibleCustomers = customers.slice((page - 1) * adminTablePageSize, page * adminTablePageSize)
+  const firstResult = customers.length > 0 ? (page - 1) * adminTablePageSize + 1 : 0
+  const lastResult = customers.length > 0 ? firstResult + visibleCustomers.length - 1 : 0
+
+  return <AdminTablePage title="Clientes" eyebrow="Relaciones" description="Perfiles registrados en NexusPOS." loading={query.isLoading} error={query.isError} wrap={false}>
+    <div className="admin-table-summary">Mostrando {firstResult}–{lastResult} de {customers.length} clientes</div>
+    <div className="table-wrap"><table className="data-table"><thead><tr><th>Cliente</th><th>Documento</th><th>Contacto</th><th>Ciudad / Dirección</th><th>Registro</th></tr></thead><tbody>{visibleCustomers.length > 0 ? visibleCustomers.map((item) => <tr key={item.id}><td><strong>{item.firstName} {item.lastName}</strong><small>{item.email}</small></td><td>{item.documentNumber}</td><td>{item.phone ?? '—'}</td><td>{item.address ?? '—'}</td><td>{formatDate(item.createdAt)}</td></tr>) : <tr><td colSpan={5}><EmptyState message="No hay clientes registrados." /></td></tr>}</tbody></table></div>
+    <TablePagination page={page} totalPages={totalPages} label="Paginación de clientes" onPageChange={setPage} />
+  </AdminTablePage>
 }
 
 export function AdminMovementsPage() {
@@ -50,4 +90,14 @@ export function AdminMovementsPage() {
 
 function AdminTablePage({ title, eyebrow, description, loading, error, children, wrap = true }: { title: string; eyebrow: string; description: string; loading: boolean; error: boolean; children: React.ReactNode; wrap?: boolean }) {
   return <><div className="admin-heading"><div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div></div>{loading && <LoadingState />}{error && <ErrorState message={`No fue posible cargar ${title.toLowerCase()}.`} />}{!loading && !error && (wrap ? <div className="table-wrap">{children}</div> : children)}</>
+}
+
+function TablePagination({ page, totalPages, disabled = false, label, onPageChange }: { page: number; totalPages: number; disabled?: boolean; label: string; onPageChange: (page: number) => void }) {
+  if (totalPages <= 1) return null
+
+  return <nav className="pagination movements-pagination" aria-label={label}>
+    <button disabled={page <= 1 || disabled} onClick={() => onPageChange(page - 1)}>Anterior</button>
+    <span>Página {page} de {totalPages}</span>
+    <button disabled={page >= totalPages || disabled} onClick={() => onPageChange(page + 1)}>Siguiente</button>
+  </nav>
 }

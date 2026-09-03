@@ -372,18 +372,6 @@ NexusPOS/
 ├── NexusPOS.slnx
 └── .env.example
 ```
-
-## Capturas de pantalla
-
-La estructura queda preparada para agregar imágenes en `docs/screenshots/`:
-
-```text
-docs/screenshots/catalog.png
-docs/screenshots/checkout.png
-docs/screenshots/invoice.png
-docs/screenshots/admin-dashboard.png
-```
-
 ## Decisiones técnicas
 
 - Monolito modular para mantener transacciones simples y despliegue único.
