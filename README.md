@@ -408,4 +408,7 @@ docs/screenshots/admin-dashboard.png
 
 ## Licencia
 
-NexusPOS se distribuye bajo la licencia MIT. Consulta [LICENSE](LICENSE).
+NexusPOS no se distribuye bajo ninguna licencia de código abierto o de uso
+público. Copyright © 2026 Marco Acosta. Todos los derechos reservados. Consulta
+[LICENSE](LICENSE) para conocer las restricciones aplicables. Las dependencias
+de terceros conservan sus respectivas licencias y condiciones.
