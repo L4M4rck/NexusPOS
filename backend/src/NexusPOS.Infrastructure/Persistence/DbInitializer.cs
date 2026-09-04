@@ -7,7 +7,8 @@ using NexusPOS.Domain.Entities;
 using NexusPOS.Domain.Enums;
 
 namespace NexusPOS.Infrastructure.Persistence;
-
+// Prepara la base al arrancar: aplica migraciones, completa imágenes antiguas y
+// crea datos demostrativos únicamente cuando todavía no existen usuarios.
 public sealed class DbInitializer(
     NexusPosDbContext dbContext,
     IPasswordHasher<User> passwordHasher,
@@ -24,10 +25,12 @@ public sealed class DbInitializer(
         ["Accesorios"] = "https://images.unsplash.com/photo-1592840496694-26d035b52b48?auto=format&fit=crop&w=1200&q=85"
     };
 
+    // Sincroniza el esquema y garantiza un conjunto inicial reproducible.
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         if (dbContext.Database.IsRelational())
         {
+            // En MySQL se aplican solo las migraciones pendientes registradas por EF.
             await dbContext.Database.MigrateAsync(cancellationToken);
         }
         else
@@ -37,6 +40,7 @@ public sealed class DbInitializer(
 
         await EnsureCategoryImagesAsync(cancellationToken);
 
+        // El seed principal es idempotente: no duplica información al reiniciar la API.
         if (await dbContext.Users.AnyAsync(cancellationToken))
         {
             return;
@@ -50,6 +54,7 @@ public sealed class DbInitializer(
         {
             if (!environment.IsDevelopment() && !environment.IsEnvironment("Testing"))
             {
+                // Fuera de entornos locales nunca se permiten contraseñas predeterminadas.
                 throw new InvalidOperationException("Las contraseñas de seed deben configurarse mediante variables de entorno.");
             }
 
@@ -82,6 +87,7 @@ public sealed class DbInitializer(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    // Completa ImageUrl en categorías creadas antes de la migración de imágenes.
     private async Task EnsureCategoryImagesAsync(CancellationToken cancellationToken)
     {
         var categoriesWithoutImage = await dbContext.Categories
@@ -105,6 +111,7 @@ public sealed class DbInitializer(
         }
     }
 
+    // Crea un usuario y calcula inmediatamente su hash de contraseña.
     private User CreateUser(string firstName, string lastName, string email, string password, UserRole role)
     {
         var user = new User
@@ -119,6 +126,7 @@ public sealed class DbInitializer(
         return user;
     }
 
+    // Crea un User Customer junto con su perfil comercial uno-a-uno.
     private User CreateCustomer(string firstName, string lastName, string email, string password, string document, string phone, string address)
     {
         var user = CreateUser(firstName, lastName, email, password, UserRole.Customer);
@@ -126,6 +134,7 @@ public sealed class DbInitializer(
         return user;
     }
 
+    // Construye el catálogo demostrativo enlazando cada producto con su categoría.
     private static Product[] CreateProducts(Category[] categories)
     {
         var data = new (string Sku, string Name, string Description, decimal Price, int Stock, int Category, string Image)[]

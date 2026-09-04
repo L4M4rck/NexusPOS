@@ -7,14 +7,17 @@ using NexusPOS.Infrastructure.Persistence;
 
 namespace NexusPOS.Infrastructure.Catalog;
 
+// Implementa consultas y mantenimiento del catálogo mediante EF Core.
 internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogService
 {
     private const int MaxPageSize = 50;
 
+    // Aplica visibilidad, búsqueda, categoría, orden y paginación en la base de datos.
     public async Task<PagedResponse<ProductResponse>> GetProductsAsync(ProductQuery query, CancellationToken cancellationToken)
     {
         var page = Math.Max(query.Page, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
+        // AsNoTracking reduce memoria en una consulta que no modificará entidades.
         var products = dbContext.Products.AsNoTracking().Include(x => x.Category).AsQueryable();
 
         if (!query.IncludeInactive)
@@ -33,6 +36,7 @@ internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogServ
             products = products.Where(x => x.CategoryId == query.CategoryId.Value);
         }
 
+        // El switch limita las columnas de orden válidas y evita construir SQL desde texto arbitrario.
         products = query.Sort.ToLowerInvariant() switch
         {
             "price_asc" => products.OrderBy(x => x.Price),
@@ -42,6 +46,7 @@ internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogServ
             _ => products.OrderBy(x => x.Name)
         };
 
+        // Count calcula metadatos; Skip/Take hace que MySQL entregue únicamente la página solicitada.
         var totalItems = await products.CountAsync(cancellationToken);
         var items = await products.Skip((page - 1) * pageSize).Take(pageSize)
             .Select(x => new ProductResponse(
@@ -52,6 +57,7 @@ internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogServ
         return new PagedResponse<ProductResponse>(items, page, pageSize, totalItems, totalPages);
     }
 
+    // Obtiene un producto individual respetando su visibilidad.
     public async Task<ProductResponse> GetProductAsync(int id, bool includeInactive, CancellationToken cancellationToken)
     {
         var product = await dbContext.Products.AsNoTracking().Include(x => x.Category)
@@ -60,6 +66,7 @@ internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogServ
         return ToResponse(product);
     }
 
+    // Valida y crea un producto con SKU normalizado.
     public async Task<ProductResponse> CreateProductAsync(CreateProductRequest request, CancellationToken cancellationToken)
     {
         await ValidateProductAsync(request.Sku, request.Name, request.Price, request.Stock, request.CategoryId, null, cancellationToken);
@@ -79,6 +86,7 @@ internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogServ
         return ToResponse(product);
     }
 
+    // Actualiza un producto existente y registra su fecha de modificación.
     public async Task<ProductResponse> UpdateProductAsync(int id, UpdateProductRequest request, CancellationToken cancellationToken)
     {
         var product = await dbContext.Products.Include(x => x.Category).SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
@@ -97,6 +105,7 @@ internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogServ
         return ToResponse(product);
     }
 
+    // Cambia el estado lógico sin borrar el producto ni romper SaleItems históricos.
     public async Task SetProductStatusAsync(int id, bool isActive, CancellationToken cancellationToken)
     {
         var product = await dbContext.Products.SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
@@ -106,6 +115,7 @@ internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogServ
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    // Lista categorías proyectando solo los campos requeridos por la API.
     public async Task<IReadOnlyList<CategoryResponse>> GetCategoriesAsync(bool includeInactive, CancellationToken cancellationToken) =>
         await dbContext.Categories.AsNoTracking()
             .Where(x => includeInactive || x.IsActive)
@@ -113,6 +123,7 @@ internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogServ
             .Select(x => new CategoryResponse(x.Id, x.Name, x.Description, x.ImageUrl, x.IsActive))
             .ToListAsync(cancellationToken);
 
+    // Crea una categoría después de asegurar que su nombre no se repita.
     public async Task<CategoryResponse> CreateCategoryAsync(SaveCategoryRequest request, CancellationToken cancellationToken)
     {
         ValidateCategory(request.Name);
@@ -134,6 +145,7 @@ internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogServ
         return new CategoryResponse(category.Id, category.Name, category.Description, category.ImageUrl, category.IsActive);
     }
 
+    // Actualiza datos y estado de una categoría.
     public async Task<CategoryResponse> UpdateCategoryAsync(int id, SaveCategoryRequest request, CancellationToken cancellationToken)
     {
         ValidateCategory(request.Name);
@@ -153,6 +165,7 @@ internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogServ
         return new CategoryResponse(category.Id, category.Name, category.Description, category.ImageUrl, category.IsActive);
     }
 
+    // Centraliza reglas compartidas entre creación y edición de productos.
     private async Task ValidateProductAsync(string sku, string name, decimal price, int stock, int categoryId, int? currentId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(sku) || string.IsNullOrWhiteSpace(name))
@@ -177,6 +190,7 @@ internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogServ
         }
     }
 
+    // Evita nombres de categoría vacíos.
     private static void ValidateCategory(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -185,9 +199,11 @@ internal sealed class CatalogService(NexusPosDbContext dbContext) : ICatalogServ
         }
     }
 
+    // Convierte texto opcional vacío en null y elimina espacios laterales.
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    // Mapea la entidad persistente a un contrato seguro para el frontend.
     private static ProductResponse ToResponse(Product product) => new(
         product.Id, product.Sku, product.Name, product.Description, product.Price, product.Stock,
         product.CategoryId, product.Category.Name, product.ImageUrl, product.IsActive);

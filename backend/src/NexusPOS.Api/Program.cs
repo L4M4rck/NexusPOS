@@ -5,6 +5,8 @@ using NexusPOS.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Registra las capacidades de la API y delega a Infrastructure la configuración
+// de MySQL, JWT y las implementaciones de los casos de uso.
 builder.Configuration.AddEnvironmentVariables();
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
@@ -18,6 +20,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod();
     });
 });
+
+// Swagger describe los endpoints y permite probar rutas protegidas enviando un JWT Bearer.
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -36,6 +40,9 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// El orden del pipeline es importante: los errores envuelven toda la petición y
+// autenticación debe ejecutarse antes de comprobar permisos.
 app.UseMiddleware<ProblemDetailsMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
@@ -47,6 +54,8 @@ app.MapHealthChecks("/health").AllowAnonymous();
 
 if (!app.Environment.IsEnvironment("Testing"))
 {
+    // En ejecución normal aplica migraciones pendientes y crea los datos iniciales.
+    // Testing administra su propia base para mantener las pruebas aisladas.
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider.GetRequiredService<DbInitializer>().InitializeAsync();
 }

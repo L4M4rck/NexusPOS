@@ -7,15 +7,18 @@ using NexusPOS.Infrastructure.Sales;
 
 namespace NexusPOS.Infrastructure.Invoices;
 
+// Consulta documentos facturados aplicando filtros de propiedad y administración.
 internal sealed class InvoiceService(NexusPosDbContext dbContext) : IInvoiceService
 {
     private const int MaxPageSize = 50;
 
+    // Obtiene el historial reciente visible para la identidad actual.
     public async Task<IReadOnlyList<InvoiceResponse>> GetInvoicesAsync(int userId, bool isAdmin, CancellationToken cancellationToken)
     {
         var query = dbContext.Invoices.AsNoTracking().Include(x => x.Sale).ThenInclude(x => x.Items).AsQueryable();
         if (!isAdmin)
         {
+            // El filtro de propiedad se ejecuta en SQL y evita cargar facturas ajenas en memoria.
             query = query.Where(x => x.Sale.Customer.UserId == userId);
         }
 
@@ -23,6 +26,7 @@ internal sealed class InvoiceService(NexusPosDbContext dbContext) : IInvoiceServ
         return invoices.Select(x => x.ToInvoiceResponse()).ToArray();
     }
 
+    // Resuelve búsqueda, ordenamiento y paginación del apartado Movimientos.
     public async Task<PagedResponse<InvoiceResponse>> GetMovementsAsync(
         int userId,
         bool isAdmin,
@@ -46,6 +50,7 @@ internal sealed class InvoiceService(NexusPosDbContext dbContext) : IInvoiceServ
                 x.CustomerDocumentSnapshot.ToLower().Contains(search));
         }
 
+        // ThenBy(Id) estabiliza el orden cuando dos movimientos comparten fecha, número o total.
         query = request.Sort.ToLowerInvariant() switch
         {
             "date_asc" => query.OrderBy(x => x.IssuedAt).ThenBy(x => x.Id),
@@ -62,6 +67,7 @@ internal sealed class InvoiceService(NexusPosDbContext dbContext) : IInvoiceServ
             .Take(pageSize)
             .Include(x => x.Sale)
             .ThenInclude(x => x.Items)
+            // Divide la carga de relaciones para evitar multiplicación cartesiana de filas.
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
         var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
@@ -73,6 +79,7 @@ internal sealed class InvoiceService(NexusPosDbContext dbContext) : IInvoiceServ
             totalPages);
     }
 
+    // Busca una factura por ID e integra autorización en la misma consulta.
     public async Task<InvoiceResponse> GetInvoiceAsync(long id, int userId, bool isAdmin, CancellationToken cancellationToken)
     {
         var invoice = await dbContext.Invoices.AsNoTracking().Include(x => x.Sale).ThenInclude(x => x.Items)

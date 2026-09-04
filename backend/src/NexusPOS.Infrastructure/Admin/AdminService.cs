@@ -5,9 +5,11 @@ using NexusPOS.Domain.Exceptions;
 using NexusPOS.Infrastructure.Persistence;
 
 namespace NexusPOS.Infrastructure.Admin;
-
+// Implementa las consultas administrativas y transforma ventas completas en
+// métricas listas para el dashboard.
 internal sealed class AdminService(NexusPosDbContext dbContext, int lowStockThreshold) : IAdminService
 {
+    // Calcula indicadores dentro del rango semanal, mensual o anual solicitado.
     public async Task<DashboardResponse> GetDashboardAsync(string period, CancellationToken cancellationToken)
     {
         var normalizedPeriod = period.ToLowerInvariant();
@@ -20,12 +22,14 @@ internal sealed class AdminService(NexusPosDbContext dbContext, int lowStockThre
             _ => throw new BusinessException("El periodo debe ser weekly, monthly o yearly.")
         };
 
+        // Se cargan solo ventas completadas porque una operación fallida no representa ingreso real.
         var sales = await dbContext.Sales.AsNoTracking()
             .Include(x => x.Items)
             .Include(x => x.Customer).ThenInclude(x => x.User)
             .Where(x => x.Status == SaleStatus.Completed && x.CreatedAt >= from)
             .ToListAsync(cancellationToken);
 
+        // A partir del mismo conjunto se calculan la serie, ranking, últimos movimientos y KPI.
         var series = BuildSeries(sales, normalizedPeriod, from, now);
         var topProducts = sales.SelectMany(x => x.Items)
             .GroupBy(x => x.ProductNameSnapshot)
@@ -56,6 +60,7 @@ internal sealed class AdminService(NexusPosDbContext dbContext, int lowStockThre
             recent);
     }
 
+    // Lista clientes junto con los datos de identidad almacenados en User.
     public async Task<IReadOnlyList<CustomerResponse>> GetCustomersAsync(CancellationToken cancellationToken)
     {
         var customers = await dbContext.Customers.AsNoTracking().Include(x => x.User)
@@ -63,6 +68,7 @@ internal sealed class AdminService(NexusPosDbContext dbContext, int lowStockThre
         return customers.Select(MapCustomer).ToArray();
     }
 
+    // Obtiene un cliente individual o produce una excepción 404.
     public async Task<CustomerResponse> GetCustomerAsync(int id, CancellationToken cancellationToken)
     {
         var customer = await dbContext.Customers.AsNoTracking().Include(x => x.User)
@@ -71,6 +77,7 @@ internal sealed class AdminService(NexusPosDbContext dbContext, int lowStockThre
         return MapCustomer(customer);
     }
 
+    // Genera puntos mensuales para el año o diarios para semana y mes.
     private static IReadOnlyList<DashboardSeriesPoint> BuildSeries(
         IReadOnlyList<Domain.Entities.Sale> sales,
         string period,
@@ -96,6 +103,7 @@ internal sealed class AdminService(NexusPosDbContext dbContext, int lowStockThre
             }).ToArray();
     }
 
+    // Convierte las entidades relacionadas Customer/User al DTO público.
     private static CustomerResponse MapCustomer(Domain.Entities.Customer customer) => new(
         customer.Id,
         customer.User.FirstName,

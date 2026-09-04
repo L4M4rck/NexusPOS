@@ -21,15 +21,19 @@ using NexusPOS.Infrastructure.Persistence;
 using NexusPOS.Infrastructure.Sales;
 
 namespace NexusPOS.Infrastructure;
-
+// Composition Root de Infrastructure: conecta las interfaces de Application con
+// implementaciones concretas y configura MySQL, JWT y reglas parametrizables.
 public static class DependencyInjection
 {
+    // Registra toda la infraestructura necesaria para ejecutar NexusPOS.
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        // DbContext es Scoped: cada petición HTTP recibe una unidad de trabajo independiente.
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection no está configurada.");
         services.AddDbContext<NexusPosDbContext>(options => options.UseMySQL(connectionString));
 
+        // Se valida el secreto durante el arranque para fallar rápido ante una configuración insegura.
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         var jwt = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? throw new InvalidOperationException("La configuración JWT no está disponible.");
@@ -38,6 +42,7 @@ public static class DependencyInjection
             throw new InvalidOperationException("JWT_SECRET debe contener al menos 32 caracteres.");
         }
 
+        // Cada JWT debe tener emisor, audiencia, vigencia y firma válidos.
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
@@ -55,8 +60,10 @@ public static class DependencyInjection
             });
         services.AddAuthorization();
 
+        // Las reglas configurables se leen una vez y se inyectan en los servicios que las aplican.
         var taxRate = configuration.GetValue("Business:TaxRate", 0.19m);
         var lowStockThreshold = configuration.GetValue("Business:LowStockThreshold", 5);
+        // Mapa interfaz → implementación utilizado por los controllers y servicios.
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddScoped<JwtTokenService>();
         services.AddScoped<IAuthService, AuthService>();

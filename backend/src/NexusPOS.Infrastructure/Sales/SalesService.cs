@@ -5,13 +5,16 @@ using NexusPOS.Infrastructure.Persistence;
 
 namespace NexusPOS.Infrastructure.Sales;
 
+// Implementa consultas de ventas y aplica autorización por propiedad.
 internal sealed class SalesService(NexusPosDbContext dbContext) : ISalesService
 {
+    // Lista hasta 200 ventas recientes visibles para el usuario.
     public async Task<IReadOnlyList<SaleResponse>> GetSalesAsync(int userId, bool isAdmin, CancellationToken cancellationToken)
     {
         var query = dbContext.Sales.AsNoTracking().Include(x => x.Items).Include(x => x.Invoice).AsQueryable();
         if (!isAdmin)
         {
+            // La autorización se incorpora a la consulta para no cargar ventas ajenas.
             query = query.Where(x => x.Customer.UserId == userId);
         }
 
@@ -19,6 +22,7 @@ internal sealed class SalesService(NexusPosDbContext dbContext) : ISalesService
         return sales.Select(x => x.ToSaleResponse()).ToArray();
     }
 
+    // Obtiene una venta solo si el usuario es administrador o propietario.
     public async Task<SaleResponse> GetSaleAsync(long id, int userId, bool isAdmin, CancellationToken cancellationToken)
     {
         var sale = await dbContext.Sales.AsNoTracking().Include(x => x.Items).Include(x => x.Invoice)

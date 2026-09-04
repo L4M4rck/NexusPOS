@@ -2,9 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using NexusPOS.Domain.Entities;
 
 namespace NexusPOS.Infrastructure.Persistence;
-
+// Unidad de trabajo de Entity Framework Core. Sus DbSet representan tablas y
+// OnModelCreating define restricciones que MySQL debe garantizar.
 public sealed class NexusPosDbContext(DbContextOptions<NexusPosDbContext> options) : DbContext(options)
 {
+    // Cada DbSet permite consultar y persistir una entidad del modelo relacional.
     public DbSet<User> Users => Set<User>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Category> Categories => Set<Category>();
@@ -14,8 +16,10 @@ public sealed class NexusPosDbContext(DbContextOptions<NexusPosDbContext> option
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
 
+    // Configura índices, longitudes, precisión, relaciones y check constraints.
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // User y Customer tienen relación uno-a-cero/uno mediante Customer.UserId único.
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasIndex(x => x.Email).IsUnique();
@@ -53,6 +57,7 @@ public sealed class NexusPosDbContext(DbContextOptions<NexusPosDbContext> option
             entity.Property(x => x.Description).HasMaxLength(2000);
             entity.Property(x => x.ImageUrl).HasMaxLength(1000);
             entity.Property(x => x.Price).HasPrecision(18, 2);
+            // Estas reglas se validan también en MySQL como última barrera de integridad.
             entity.ToTable(table =>
             {
                 table.HasCheckConstraint("CK_Products_Price_Positive", "`Price` > 0");
@@ -64,6 +69,7 @@ public sealed class NexusPosDbContext(DbContextOptions<NexusPosDbContext> option
         {
             entity.HasIndex(x => x.InvoiceNumber).IsUnique();
             entity.HasIndex(x => x.CreatedAt);
+            // Una misma clave solo puede producir una venta por cliente.
             entity.HasIndex(x => new { x.CustomerId, x.IdempotencyKey }).IsUnique();
             entity.Property(x => x.InvoiceNumber).HasMaxLength(30);
             entity.Property(x => x.IdempotencyKey).HasMaxLength(100);
@@ -79,6 +85,7 @@ public sealed class NexusPosDbContext(DbContextOptions<NexusPosDbContext> option
             entity.Property(x => x.ProductNameSnapshot).HasMaxLength(160);
             entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
             entity.Property(x => x.Subtotal).HasPrecision(18, 2);
+            // Restrict impide borrar un producto utilizado y perder la referencia histórica.
             entity.HasOne(x => x.Product).WithMany(x => x.SaleItems).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -90,6 +97,7 @@ public sealed class NexusPosDbContext(DbContextOptions<NexusPosDbContext> option
             entity.Property(x => x.Amount).HasPrecision(18, 2);
             entity.Property(x => x.Currency).HasMaxLength(3);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+            // SaleId funciona como FK única y materializa una relación uno-a-uno.
             entity.HasOne(x => x.Sale).WithOne(x => x.Payment).HasForeignKey<Payment>(x => x.SaleId);
         });
 
