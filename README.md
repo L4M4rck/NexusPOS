@@ -200,9 +200,82 @@ chmod +x scripts/dev.sh
 
 Los scripts levantan MySQL, ejecutan la API y abren Vite en modo desarrollo.
 
+## Base de datos
+
+NexusPOS utiliza **MySQL 8.4** como motor relacional y **Entity Framework Core
+10** con un enfoque Code First. El modelo se define en
+`NexusPosDbContext` y en las entidades de `NexusPOS.Domain`; las migraciones
+versionadas convierten ese modelo en el esquema físico de MySQL.
+
+### Modelo relacional
+
+```mermaid
+erDiagram
+    USERS ||--o| CUSTOMERS : "puede tener perfil"
+    CUSTOMERS ||--o{ SALES : "realiza"
+    CATEGORIES ||--o{ PRODUCTS : "agrupa"
+    SALES ||--|{ SALE_ITEMS : "contiene"
+    PRODUCTS ||--o{ SALE_ITEMS : "aparece en"
+    SALES ||--|| PAYMENTS : "registra"
+    SALES ||--|| INVOICES : "genera"
+```
+
+| Tabla | Clave y relaciones | Información almacenada |
+|---|---|---|
+| `Users` | PK `Id`; relación opcional 1:1 con `Customers` | Nombre, correo, hash de contraseña, rol, estado y fechas de creación/actualización |
+| `Customers` | PK `Id`; FK única `UserId` → `Users.Id` | Documento, teléfono, dirección y fecha de registro |
+| `Categories` | PK `Id` | Nombre, descripción, imagen y estado activo |
+| `Products` | PK `Id`; FK `CategoryId` → `Categories.Id` | SKU, nombre, descripción, precio, stock, imagen, estado y fechas de auditoría |
+| `Sales` | PK `Id`; FK `CustomerId` → `Customers.Id` | Clave de idempotencia, número de factura, subtotal, IVA, descuento, total, estado y fecha |
+| `SaleItems` | PK `Id`; FK `SaleId` → `Sales.Id`; FK `ProductId` → `Products.Id` | Cantidad y snapshots del nombre y precio del producto vendido |
+| `Payments` | PK `Id`; FK única `SaleId` → `Sales.Id` | Proveedor, referencia externa, monto, moneda, estado y fecha de procesamiento |
+| `Invoices` | PK `Id`; FK única `SaleId` → `Sales.Id` | Número, fecha y snapshots del nombre y documento del cliente |
+
+Los *snapshots* de `SaleItems` e `Invoices` preservan la información histórica:
+una factura emitida no cambia si después se modifica el producto o el perfil del
+cliente.
+
+### Integridad e índices
+
+- Son únicos el correo del usuario, documento del cliente, nombre de categoría,
+  SKU, número de venta/factura y referencia del proveedor de pagos.
+- La combinación `Sales.CustomerId + Sales.IdempotencyKey` es única para impedir
+  ventas duplicadas cuando una solicitud se reintenta.
+- `Payments.SaleId` e `Invoices.SaleId` son únicos y materializan relaciones 1:1
+  con la venta.
+- MySQL exige `Products.Price > 0` y `Products.Stock >= 0` mediante restricciones
+  `CHECK`.
+- Los importes monetarios usan `decimal(18,2)`, los estados y roles se guardan
+  como texto, y la base utiliza el juego de caracteres `utf8mb4`.
+- Existen índices para las consultas por categoría/estado, fechas de creación y
+  relaciones entre ventas, productos y clientes.
+- Las entidades dependientes se eliminan en cascada con su agregado. La relación
+  `SaleItems.ProductId` usa `RESTRICT` para impedir que se borre un producto que
+  ya forma parte del historial de ventas.
+
+### Ejecución y persistencia en Docker
+
+Docker Compose ejecuta la base en el servicio `mysql` usando la imagen
+`mysql:8.4`. El puerto local `3306` se publica para tareas de desarrollo y los
+datos se conservan en el volumen nombrado `mysql-data`. El backend espera a que
+el *healthcheck* de MySQL sea satisfactorio antes de iniciar.
+
+Durante el arranque, `DbInitializer` realiza este proceso:
+
+1. Aplica las migraciones pendientes mediante `Database.MigrateAsync()`.
+2. Completa imágenes de categorías creadas antes de la migración correspondiente.
+3. Ejecuta el seed de desarrollo solo cuando la tabla `Users` está vacía.
+
+Detener los contenedores con `docker compose down` conserva el volumen. Usar
+`docker compose down -v` elimina `mysql-data` y, por tanto, toda la información
+local de la base de datos.
+
 ## Migraciones
 
-La migración inicial se encuentra versionada en `backend/src/NexusPOS.Infrastructure/Persistence/Migrations`.
+Las migraciones se encuentran versionadas en
+`backend/src/NexusPOS.Infrastructure/Persistence/Migrations`. Actualmente,
+`InitialCreate` crea las ocho tablas, relaciones, índices y restricciones;
+`AddCategoryImage` incorpora `Categories.ImageUrl`.
 
 Crear una migración nueva:
 
